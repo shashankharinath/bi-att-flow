@@ -30,19 +30,24 @@ class Model(object):
                                            initializer=tf.constant_initializer(0), trainable=False)
 
         # Define forward inputs here
-        N, M, JX, JQ, VW, VC, W = \
-            config.batch_size, config.max_num_sents, config.max_sent_size, \
+        M, JX, JQ, VW, VC, W = \
+            config.max_num_sents, config.max_sent_size, \
             config.max_ques_size, config.word_vocab_size, config.char_vocab_size, config.max_word_size
-        self.x = tf.placeholder('int32', [N, None, None], name='x')
-        self.cx = tf.placeholder('int32', [N, None, None, W], name='cx')
-        self.x_mask = tf.placeholder('bool', [N, None, None], name='x_mask')
-        self.q = tf.placeholder('int32', [N, None], name='q')
-        self.cq = tf.placeholder('int32', [N, None, W], name='cq')
-        self.q_mask = tf.placeholder('bool', [N, None], name='q_mask')
-        self.y = tf.placeholder('bool', [N, None, None], name='y')
-        self.y2 = tf.placeholder('bool', [N, None, None], name='y2')
-        self.is_train = tf.placeholder('bool', [], name='is_train')
-        self.new_emb_mat = tf.placeholder('float', [None, config.word_emb_size], name='new_emb_mat')
+
+        self.x = tf.placeholder('int32', [None, None, None], name='x')
+        self.cx = tf.placeholder('int32', [None, None, None, W], name='cx')
+        self.x_mask = tf.placeholder('bool', [None, None, None], name='x_mask')
+        self.q = tf.placeholder('int32', [None, None], name='q')
+        self.cq = tf.placeholder('int32', [None, None, W], name='cq')
+        self.q_mask = tf.placeholder('bool', [None, None], name='q_mask')
+        self.y = tf.placeholder('bool', [None, None, None], name='y')
+        self.y2 = tf.placeholder('bool', [None, None, None], name='y2')
+        self.train = tf.placeholder('bool', [40], name='train')
+        self.is_train = tf.gather(self.train, 0, name='is_train')
+        self.new_emb_mat = tf.constant(config.new_emb_mat, dtype=tf.float32, name="new_emb_mat")
+
+        N = tf.shape(self.x)[0]
+        self.batch_size = N
 
         # Define misc
         self.tensor_dict = {}
@@ -69,7 +74,7 @@ class Model(object):
     def _build_forward(self):
         config = self.config
         N, M, JX, JQ, VW, VC, d, W = \
-            config.batch_size, config.max_num_sents, config.max_sent_size, \
+            self.batch_size, config.max_num_sents, config.max_sent_size, \
             config.max_ques_size, config.word_vocab_size, config.char_vocab_size, config.hidden_size, \
             config.max_word_size
         JX = tf.shape(self.x)[2]
@@ -149,7 +154,6 @@ class Model(object):
                 h = tf.concat(3, [fw_h, bw_h])  # [N, M, JX, 2d]
             self.tensor_dict['u'] = u
             self.tensor_dict['h'] = h
-
         with tf.variable_scope("main"):
             if config.dynamic_att:
                 p0 = h
@@ -281,15 +285,18 @@ class Model(object):
         cq = np.zeros([N, JQ, W], dtype='int32')
         q_mask = np.zeros([N, JQ], dtype='bool')
 
+        if is_train:
+            feed_dict[self.train] = np.ones(40, dtype=bool)
+        else:
+            feed_dict[self.train] = np.zeros(40, dtype=bool)
         feed_dict[self.x] = x
         feed_dict[self.x_mask] = x_mask
         feed_dict[self.cx] = cx
         feed_dict[self.q] = q
         feed_dict[self.cq] = cq
         feed_dict[self.q_mask] = q_mask
-        feed_dict[self.is_train] = is_train
-        if config.use_glove_for_unk:
-            feed_dict[self.new_emb_mat] = batch.shared['new_emb_mat']
+        #if config.use_glove_for_unk:
+            #feed_dict[self.new_emb_mat] = batch.shared['new_emb_mat']
 
         X = batch.data['x']
         CX = batch.data['cx']

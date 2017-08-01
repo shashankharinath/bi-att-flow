@@ -76,6 +76,7 @@ def _train(config):
                         else np.random.multivariate_normal(np.zeros(config.word_emb_size), np.eye(config.word_emb_size))
                         for idx in range(config.word_vocab_size)])
     config.emb_mat = emb_mat
+    config.new_emb_mat = train_data.shared['new_emb_mat']
 
     # construct model graph and variables (using default graph)
     pprint(config.__flags, indent=2)
@@ -134,11 +135,7 @@ def _test(config):
     _config_debug(config)
 
     if config.use_glove_for_unk:
-        word2vec_dict = test_data.shared['lower_word2vec'] if config.lower_word else test_data.shared['word2vec']
-        new_word2idx_dict = test_data.shared['new_word2idx']
-        idx2vec_dict = {idx: word2vec_dict[word] for word, idx in new_word2idx_dict.items()}
-        new_emb_mat = np.array([idx2vec_dict[idx] for idx in range(len(idx2vec_dict))], dtype='float32')
-        config.new_emb_mat = new_emb_mat
+        config.new_emb_mat = test_data.shared['new_emb_mat']
 
     pprint(config.__flags, indent=2)
     models = get_multi_gpu_models(config)
